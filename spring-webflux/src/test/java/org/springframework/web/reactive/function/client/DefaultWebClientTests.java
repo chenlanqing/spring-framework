@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -34,8 +34,14 @@ import org.springframework.core.NamedThreadLocal;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 /**
  * Unit tests for {@link DefaultWebClient}.
@@ -58,7 +64,7 @@ public class DefaultWebClientTests {
 		MockitoAnnotations.initMocks(this);
 		this.exchangeFunction = mock(ExchangeFunction.class);
 		ClientResponse mockResponse = mock(ClientResponse.class);
-		when(this.exchangeFunction.exchange(this.captor.capture())).thenReturn(Mono.just(mockResponse));
+		given(this.exchangeFunction.exchange(this.captor.capture())).willReturn(Mono.just(mockResponse));
 		this.builder = WebClient.builder().baseUrl("/base").exchangeFunction(this.exchangeFunction);
 	}
 
@@ -82,6 +88,17 @@ public class DefaultWebClientTests {
 
 		ClientRequest request = verifyAndGetRequest();
 		assertEquals("/base/path?q=12", request.url().toString());
+	}
+
+	@Test // gh-22705
+	public void uriBuilderWithUriTemplate() {
+		this.builder.build().get()
+					.uri("/path/{id}", builder -> builder.queryParam("q", "12").build("identifier"))
+					.exchange().block(Duration.ofSeconds(10));
+
+		ClientRequest request = verifyAndGetRequest();
+		assertEquals("/base/path/identifier?q=12", request.url().toString());
+		assertEquals("/path/{id}", request.attribute(WebClient.class.getName() + ".uriTemplate").get());
 	}
 
 	@Test
@@ -167,7 +184,7 @@ public class DefaultWebClientTests {
 		Mono<Void> mono = Mono.empty();
 		WebClient client = this.builder.build();
 
-		client.post().uri("http://example.com").syncBody(mono);
+		client.post().uri("https://example.com").syncBody(mono);
 	}
 
 	@Test
@@ -266,7 +283,7 @@ public class DefaultWebClientTests {
 	@Test
 	public void switchToErrorOnEmptyClientResponseMono() {
 		ExchangeFunction exchangeFunction = mock(ExchangeFunction.class);
-		when(exchangeFunction.exchange(any())).thenReturn(Mono.empty());
+		given(exchangeFunction.exchange(any())).willReturn(Mono.empty());
 		WebClient.Builder builder = WebClient.builder().baseUrl("/base").exchangeFunction(exchangeFunction);
 		StepVerifier.create(builder.build().get().uri("/path").exchange())
 				.expectErrorMessage("The underlying HTTP client completed without emitting a response.")
@@ -276,12 +293,12 @@ public class DefaultWebClientTests {
 	@Test
 	public void shouldApplyFiltersAtSubscription() {
 		WebClient client = this.builder
-				.filter((request, next) -> {
-					return next.exchange(ClientRequest
+				.filter((request, next) ->
+					next.exchange(ClientRequest
 							.from(request)
 							.header("Custom", "value")
-							.build());
-				})
+							.build())
+				)
 				.build();
 		Mono<ClientResponse> exchange = client.get().uri("/path").exchange();
 		verifyZeroInteractions(this.exchangeFunction);
