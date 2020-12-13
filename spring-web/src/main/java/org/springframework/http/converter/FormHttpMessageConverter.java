@@ -232,7 +232,8 @@ public class FormHttpMessageConverter implements HttpMessageConverter<MultiValue
 	}
 
 	/**
-	 * Return the {@link #setPartConverters configured} converters for MIME parts.
+	 * Return the {@linkplain #setPartConverters configured converters} for MIME
+	 * parts.
 	 * @since 5.3
 	 */
 	public List<HttpMessageConverter<?>> getPartConverters() {
@@ -469,8 +470,10 @@ public class FormHttpMessageConverter implements HttpMessageConverter<MultiValue
 			contentType = MediaType.MULTIPART_FORM_DATA;
 		}
 
+		Map<String, String> parameters = new LinkedHashMap<>(contentType.getParameters().size() + 2);
+		parameters.putAll(contentType.getParameters());
+
 		byte[] boundary = generateMultipartBoundary();
-		Map<String, String> parameters = new LinkedHashMap<>(2);
 		if (!isFilenameCharsetSet()) {
 			parameters.put("charset", this.charset.name());
 		}
